@@ -7,6 +7,7 @@
 #include <hap.h>
 #include <hap_apple_servs.h>
 #include <hap_apple_chars.h>
+
 namespace esphome
 {
   namespace homekit
@@ -17,6 +18,7 @@ namespace esphome
       static constexpr const char* TAG = "SensorEntity";
       std::map<AInfo, const char*> accessory_info = {{NAME, NULL}, {MODEL, "HAP-SENSOR"}, {SN, NULL}, {MANUFACTURER, "rednblkx"}, {FW_REV, "0.1"}};
       sensor::Sensor* sensorPtr;
+
       void on_sensor_update(sensor::Sensor* obj, float v) {
         ESP_LOGD(TAG, "%s value: %.2f", obj->get_name().c_str(), v);
         hap_acc_t* acc = hap_acc_get_by_aid(hap_get_unique_aid(std::to_string(obj->get_object_id_hash()).c_str()));
@@ -32,6 +34,7 @@ namespace esphome
         }
         return;
       }
+
       static int sensor_read(hap_char_t* hc, hap_status_t* status_code, void* serv_priv, void* read_priv) {
         if (serv_priv) {
           sensor::Sensor* sensorPtr = (sensor::Sensor*)serv_priv;
@@ -43,18 +46,22 @@ namespace esphome
         }
         return HAP_FAIL;
       }
+
       static int acc_identify(hap_acc_t* ha) {
         ESP_LOGI(TAG, "Accessory identified");
         return HAP_SUCCESS;
       }
+
     public:
       SensorEntity(sensor::Sensor* sensorPtr) : sensorPtr(sensorPtr) {}
+
       void setInfo(std::map<AInfo, const char*> info) {
         std::map<AInfo, const char*> merged_info;
         merged_info.merge(info);
         merged_info.merge(this->accessory_info);
         this->accessory_info.swap(merged_info);
       }
+
       void setup() {
         hap_serv_t* service = nullptr;
 
@@ -85,6 +92,11 @@ namespace esphome
           service = hap_serv_create(HAP_SERV_UUID_AIR_QUALITY_SENSOR);
           hap_serv_add_char(service, hap_char_pm_2_5_density_create(sensorPtr->state));
         }
+        else if (std::equal(device_class.begin(), device_class.end(), strdup("distance"))) {
+          service = hap_serv_create(HAP_SERV_UUID_DISTANCE_SENSOR);
+          hap_serv_add_char(service, hap_char_distance_create(sensorPtr->state));
+        }
+
         if (service) {
           hap_acc_cfg_t acc_cfg = {
               .model = strdup(accessory_info[MODEL]),
@@ -101,7 +113,7 @@ namespace esphome
             acc_cfg.name = strdup(accessory_name.c_str());
           }
           else {
-          acc_cfg.name = strdup(accessory_info[NAME]);
+            acc_cfg.name = strdup(accessory_info[NAME]);
           }
           if (accessory_info[SN] == NULL) {
             acc_cfg.serial_num = strdup(std::to_string(sensorPtr->get_object_id_hash()).c_str());
@@ -118,7 +130,6 @@ namespace esphome
 
           /* Add the Sensor Service to the Accessory Object */
           hap_acc_add_serv(accessory, service);
-
 
           /* Add the Accessory to the HomeKit Database */
           hap_add_bridged_accessory(accessory, hap_get_unique_aid(std::to_string(sensorPtr->get_object_id_hash()).c_str()));
